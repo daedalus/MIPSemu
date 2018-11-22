@@ -137,16 +137,16 @@ def decode_and_execute(instruction):
 			regs[rd] = (regs[rs] | regs[rt]) ^ REGBITS
 			PC = PC + 4
 		else if funct == 0x2A: #SLT		
-			if sign(regs[rs]) < sign(regs[rt]):
-				regs[rd] = regs[rd] | 1
+			if sint(regs[rs]) < sint(regs[rt]):
+				regs[rd] = sint(1)
 			else
-				regs[rd] = regs[rd] | 0
+				regs[rd] = sint(0)
 			PC = PC + 4
 		else if funct == 0x2B: #SLTU		
 			if regs[rs] < regs[rt]:
-                                regs[rd] = regs[rd] | 1
+                                regs[rd] = 1
                         else
-                                regs[rd] = regs[rd] | 0
+                                regs[rd] = 0
 			PC = PC + 4
 		else:
 			EPC = PC
@@ -184,14 +184,9 @@ def decode_and_execute(instruction):
 			else:
 				PC = PC + 4
 		else if opcode == 0x0C: #ANDI 
-			regs[rt] = sint(regs[rs]) & sint(inmediate & 0xFFFF)
-			OF = (sint(regs[rt]) >= REGBITS)
-                        if OF == 1:
-                                Cause_Reg = 0b1100
-                        else:
-				PC = PC + 4
+			regs[rt] = sint(regs[rs]) & inmediate & 0xFFFF 
+			PC = PC + 4
 		else if opcode == 0x04: #BEQ
-			#print "opcode NOT IMPLEMENTED",opcode
 			if regs[rt] = regs[rt] 
 				PC += 4 + 4 * (inmediate & 0xFFFF)
 			else:
@@ -216,7 +211,13 @@ def decode_and_execute(instruction):
 				regs[rd] = EPC
 			if rt = 0b01101:
 				regs[rd] = Cause_Reg
-			PC = PC + 4	
+			PC = PC + 4
+		else if opcode == 0x0A: #SLTI
+			if regs[rs] < sint(inmediate & 0xFFFF):
+				regs[rs] = sign(1)
+			else:
+				regs[rs] = sign(0)
+			PC = PC + 4
 		else if opcode == 0x0D: #ORI
 			regs[rd] = regs[rs] | (inmediate & 0xFFFF)
 			PC = PC + 4
