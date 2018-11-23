@@ -52,8 +52,26 @@ def decode_and_execute(instruction):
 		shamt = (insctuction[2] & 0b00000111) << 8 + (instruction[3] & 0b11000000) >> 6
 		funct = (instruction[3] & 0b11111100) >> 2
 
-		if funct == 0x00: #NOP
+		if funct == 0x00: #NOP/SLL R0,0 WIP
+			regs[rd] = regs[rt] << shamt
 			PC = PC + 4
+		else if funct == 0x02: #SRL WIP
+			regs[rd] = regs[rt] >> shamt
+                        PC = PC + 4
+		else if funct == 0x03: #SRA WIP
+			regs[rd] = (regs[rt] & (2**31)) + (regs[rt] >> shamt)
+			PC = PC + 4
+		else if fimct == 0x04: #SLLV
+			s = regs[rs] & 0b1111
+			regs[rd] = regs[rt] << s
+		else if funct == 0x06: #SRLV
+			s =  regs[rs] & 0b1111 
+			regs[rd] = regs[rt] & (2**31)) + (regs[rt] >> s)
+			PC = PC + 4
+		else if funct == 0x07: #SRAV
+			s = regs[rs] & 0b1111
+			regs[rd] = (regs[rt] & (2**31)) + (regs[rt] >> s)
+                        PC = PC + 4
 		else if funct == 0x08: #JR
 			temp = regs[rs]
 			PC = temp
@@ -66,7 +84,11 @@ def decode_and_execute(instruction):
 			PC = PC + 4
 		else if funct == 0x0C: #SYSCALL
 			PC = 0x00000080
-
+		else if funct == 0x0d: # BREAK
+			PC = 0x00000080
+		else if funct == 0x0E: #XORI
+			regs[rt] = regs[rs] ^ zero_extend(inmediate)
+			PC = PC + 4
 		else if funct == 0x12: #MFLO
 			regs[rd] = LO
 			PC = PC + 4
@@ -184,22 +206,22 @@ def decode_and_execute(instruction):
 		else if opcode == 0x0C: #ANDI 
 			regs[rt] = regs[rs] & zero_extend(inmediate)
 			PC = PC + 4
-		else if opcode == 0x04: #BEQ 1
+		else if opcode == 0x04: #BEQ 
 			if regs[rt] = regs[rt] 
 				PC += sint32(inmediate) << 2
 			else:
 				PC = PC + 4
-		else if opcode == 0x05: #BNEQ 1
+		else if opcode == 0x05: #BNEQ
 			if regs[rt] != regs[rt] 
                                 PC += sint32(inmediate) << 2
                         else:
                                 PC = PC + 4
-		else if opcode == 0x06: #BLEZ 1
+		else if opcode == 0x06: #BLEZ 
 			if regs[rs] <= 0:
 				PC = PC + sint32(inmediate) << 2
 			else:
 				PC = PC + 4
-		else if opcode == 0x07: #BGTZ 1
+		else if opcode == 0x07: #BGTZ
 			if regs[rs] > 0:
 				PC = PC + (inmediate) << 2
 			else:
