@@ -1,0 +1,96 @@
+* Means implemented
+
+Normal CPU Load/Store Instructions
+
+LB	*
+LBU
+SB	*
+LH
+LHU
+SH
+LW	*
+SW	*
+
+Unaligned CPU Load/Store Instructions
+
+LWL
+LWR
+SWL
+SWR
+
+Coprocessor Load/Store Instructions
+
+LWCz
+SWCz
+
+ALU Instructions With an Immediate Operand
+
+ADDI	*
+ADDIU	*
+SLTI	*
+SLTIU	*
+ANDI	*
+ORI	*
+XORI	*
+LUI
+
+3-Operand ALU Instructions
+
+ADD	*
+ADDU	*
+SUB	*
+SUBU	*
+SLT	*
+SLTU	*
+AND	*
+OR	*
+XOR	*
+NOR	*
+
+Shift Instructions
+
+SLL	*
+SRL	*
+SRA	*
+SLLV	*
+SRLV	*
+SRAV	*
+
+Multiply/Divide Instructions
+
+MULT	*
+MULTU	*
+DIV	*
+DIVU	*
+MFHI	*
+MTHI 
+MFLO	*
+MTLO
+
+Jump Instructions Jumping Within a 256 Megabyte Region
+
+J 	*
+JAL 	*
+
+Jump Instructions to Absolute Address
+
+JR	*
+JALR 	*
+
+PC-Relative Conditional Branch Instructions Comparing 2 Registers
+
+BEQ	*
+BNE	*
+BLEZ	*
+BGTZ	*
+
+PC-Relative Conditional Branch Instructions Comparing Against Zero
+
+BLTZ	*
+BGETZ	
+BLTZAL
+BGEZAL
+
+System Call and Breakpoint Instructions
+SYSCALL *
+BREAK	*
