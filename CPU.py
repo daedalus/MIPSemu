@@ -239,7 +239,7 @@ def decode_and_execute(instruction):
 			else:
 				regs[rs] = 0
 			PC = PC + 4	
-		else if opcode == 0x0rB: #SLTIU
+		else if opcode == 0x0C: #SLTIU
                 	if regs[rs] < sint32(inmediate):
                         	regs[rs] = 1
                         else:
