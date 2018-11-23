@@ -7,7 +7,7 @@
 memory = []
 
 REGBITS = 0xFFFFFFFF #32 bit Regs
-regs = [31] 
+regs = [0x00000000 * 31] 
 PC = 0
 HI = 0
 LO = 0
@@ -35,18 +35,17 @@ def twos_complement(input_value, num_bits):
 	mask = 2**(num_bits - 1)
 	return -(input_value & mask) + (input_value & ~mask)
 
-
-def sint(value):
-	mask = 2**(32)
-	if (value & mask >> 31)  == 1:
-		return (value + 1) *-1
+def zero_extend(value):
 	return value
+
+def sint3232(value):
+	return twos_complement(value,32)
 
 def decode_and_execute(instruction):
 	opcode = (instruction[0] & 0b11111100) >> 2
 	
 	if opcode == 0x0: # R
-                # 000000ssssstttttdddddSSSSSfffff
+                # OOOOOOssssstttttdddddSSSSSfffff
 		rs = (instruction[0] & 0b00000011)<<8 + ((instruction[1] & 0b11100000) >> 5)
 		rt = instruction[1] & 0b00011111
 		rd = (instruction[2] & 0b11111000) >> 3
@@ -56,18 +55,23 @@ def decode_and_execute(instruction):
 		if funct == 0x00: #NOP
 			PC = PC + 4
 		else if funct == 0x08: #JR
-			PC = regs[rs]
+			temp = regs[rs]
+			PC = temp
 		else if funct == 0x09: #JALR
-			regs[rd] = PC
-			PC = regs[rs]
+			temp = regs[rs]
+			regs[rd] = PC + 8 
+			PC = temp
 		else if funct == 0x10: #MFHI
 			regs[rd] = HI
 			PC = PC + 4
+		else if funct == 0x0C: #SYSCALL
+			PC = 0x00000080
+
 		else if funct == 0x12: #MFLO
 			regs[rd] = LO
 			PC = PC + 4
 		else if funct ==0x18: #MUL WIP
-	                HILO = sint(regs[rs]) * sint(regs[rt])
+	                HILO = sint32(regs[rs]) * sint32(regs[rt])
 			HI = HILO >> REGBITS
 			LO = (HILO << REGBITS) >> REGBITS
                         PC = PC + 4
@@ -78,8 +82,8 @@ def decode_and_execute(instruction):
 			PC = PC + 4
                 else if funct == 0x1A: #DIV 
                         try:
-                                LO = sint(regs[rs]) / sint(regs[rt])
-                                HI = sint(regs[rs]) % sint(regs[rt])
+                                LO = sint32(regs[rs]) / sint32(regs[rt])
+                                HI = sint32(regs[rs]) % sint32(regs[rt])
                                 PC = PC + 4
                         except:
                                 EPC = PC
@@ -97,33 +101,29 @@ def decode_and_execute(instruction):
                                 Cause_Reg = 12
                                 PC = 0x80000180
 		else if funct == 0x20: #ADD
-			regs[rd] = sint(regs[rs]) + sint(regs[rt])
-			OF = (sint(regs[rd]) >= REGBITS)
+			temp = sint32(regs[rs]) + sint32(regs[rt])
+			OF = (sint32(regs[rd]) >= REGBITS)
 			if OF == 1:
+				regs[rd] = sint32(tmp)
                                 Cause_Reg = 0b1100
                         else:
                                 PC = PC + 4
 		else if funct == 0x21: #ADDU 
-			regs[rd] = sint(regs[rs]) + sint(regs[rt])
-			OF = (sint(regs[rd]) >= REGBITS)
-			if OF == 1:
-                                Cause_Reg = 0b1100
-                        else:
-                                PC = PC + 4
+			temp = regs[rs] + regs[rt]
+			regs[rd] = sint32(temp)
+                        PC = PC + 4
 		else if funct == 0x22: #SUB
-			regs[rd] = sint(regs[rs]) - sint(regs[rt])
-			OF = (sint(regs[rd]) >= REGBITS)
+			tmp = regs[rd] 
+			regs[rd] = sint32(regs[rs]) - sint32(regs[rt])
+			OF = (sint32(regs[rd]) >= REGBITS)
 			if OF == 1:
+				regs[rd] = tmp
                                 Cause_Reg = 0b1100
                         else:
                                 PC = PC + 4	
 		else if funct == 0x23: #SUBU
 			regs[rd] = regs[rs] - regs[rt]
-			OF = (sint(regs[rd]) >= REGBITS)
-			if OF == 1:
-                                Cause_Reg = 0b1100
-                        else:
-                                PC = PC + 4	
+                        PC = PC + 4	
 		else if funct == 0x24: #AND
 			regs[rd] = regs[rs] & regs[rt]
 			PC = PC + 4
@@ -137,10 +137,10 @@ def decode_and_execute(instruction):
 			regs[rd] = (regs[rs] | regs[rt]) ^ REGBITS
 			PC = PC + 4
 		else if funct == 0x2A: #SLT		
-			if sint(regs[rs]) < sint(regs[rt]):
-				regs[rd] = sint(1)
+			if sint32(regs[rs]) < sint32(regs[rt]):
+				regs[rd] = 1
 			else
-				regs[rd] = sint(0)
+				regs[rd] = 0
 			PC = PC + 4
 		else if funct == 0x2B: #SLTU		
 			if regs[rs] < regs[rt]:
@@ -156,54 +156,52 @@ def decode_and_execute(instruction):
 		print "R opcode,rt,rs,rd,shamt,funct",opcode,rs,rt,rd,shamt,funct
 
 	else if opcode > 3: # I
-		#000000ssssstttttiiiiiiiiiiiiiiii
+		#OOOOOOssssstttttiiiiiiiiiiiiiiii
 		rs = (instruction[0] & 0b00000011) << 8 + ((instruction[1] & 0b11100000) >> 5)
 	        rt = instruction[1] & 0b00011111
         	inmediate = instruction[2] << 8 + instruction[3]
 
 		if opcode == 0x01: # BLTZ
 			if regs[rs] < 0:
-				PC = PC + 4 + 4 * (inmmediate & 0xFFFF)
+				PC = PC + sint32(inmmediate) << 2
 			else:
 				PC = PC + 4
 
 		if opcode == 0x08: #ADDI
-			regs[rt] = sint(regs[rs]) + sint(inmediate & 0xFFFF)
-			OF = (sint(regs[rt]) >= REGBITS)
+			temp = regs[rs] + sint32(inmediate) 
+			OF = (temp >= REGBITS)
 			if OF == 1:
 				EPC = PC
 				Cause_Reg = 0b1100
 				PC = 0x80000180
 			else:
+				regs[rt] = sint32(temp)
 				PC = PC + 4
 		else if opcode == 0x09: #ADDIU
-			regs[rt] = regs[rs] + inmediate & 0xFFFF
-			OF = (regs[rt] >= REGBITS)
-                        if OF == 1:
-                                Cause_Reg = 0b1100
-			else:
-				PC = PC + 4
-		else if opcode == 0x0C: #ANDI 
-			regs[rt] = sint(regs[rs]) & inmediate & 0xFFFF 
+			temp = regs[rs] + sint32(inmediate)
+			regs[rt] = sint32(temp)
 			PC = PC + 4
-		else if opcode == 0x04: #BEQ
+		else if opcode == 0x0C: #ANDI 
+			regs[rt] = regs[rs] & zero_extend(inmediate)
+			PC = PC + 4
+		else if opcode == 0x04: #BEQ 1
 			if regs[rt] = regs[rt] 
-				PC += 4 + 4 * (inmediate & 0xFFFF)
+				PC += sint32(inmediate) << 2
 			else:
 				PC = PC + 4
-		else if opcode == 0x05: #BNEQ
+		else if opcode == 0x05: #BNEQ 1
 			if regs[rt] != regs[rt] 
-                                PC += 4 + 4 * (inmediate & 0xFFFF)
+                                PC += sint32(inmediate) << 2
                         else:
                                 PC = PC + 4
-		else if opcode == 0x06: #BLEZ
+		else if opcode == 0x06: #BLEZ 1
 			if regs[rs] <= 0:
-				PC = PC + 4 + 4 * (inmediate & 0xFFFF)
+				PC = PC + sint32(inmediate) << 2
 			else:
 				PC = PC + 4
-		else if opcode == 0x07: #BGTZ
+		else if opcode == 0x07: #BGTZ 1
 			if regs[rs] > 0:
-				PC = PC + 4 + 4 * (inmediate & 0xFFFF)
+				PC = PC + (inmediate) << 2
 			else:
 				PC = PC + 4
 		else if opcode == 0x10: # MFEPC/MFCO
@@ -212,24 +210,32 @@ def decode_and_execute(instruction):
 			if rt = 0b01101:
 				regs[rd] = Cause_Reg
 			PC = PC + 4
+
 		else if opcode == 0x0A: #SLTI
-			if regs[rs] < sint(inmediate & 0xFFFF):
-				regs[rs] = sign(1)
+			if sint32(regs[rs]) < sint32(inmediate):
+				regs[rs] = 1
 			else:
-				regs[rs] = sign(0)
-			PC = PC + 4
+				regs[rs] = 0
+			PC = PC + 4	
+		else if opcode == 0x0rB: #SLTIU
+                	if regs[rs] < sint32(inmediate):
+                        	regs[rs] = 1
+                        else:
+                                regs[rs] = 0
+                        PC = PC + 4
 		else if opcode == 0x0D: #ORI
-			regs[rd] = regs[rs] | (inmediate & 0xFFFF)
+			regs[rd] = regs[rs] | (inmediate)
 			PC = PC + 4
+
 		else if opcode == 0x20:	# LB WIP
-			regs[rt] = memory[rs+(inmediate & 0xFFFF):rs+(inmediate & 0xFFFF)]
+			regs[rt] = memory[rs+(inmediate):rs+(inmediate)]
 			PC = PC + 4
 		else if opcode == 0x23: # LW WIP
 			try:
-				regs[rt] = memory[rs+(inmediate & 0xFFFF):rs+(inmediate & 0xFFFF)+0]
-				regs[rt] += memory[rs+(inmediate & 0xFFFF):rs+(inmediate & 0xFFFF)+1] << 8 #*256 #2**8
-				regs[rt] += memory[rs+(inmediate & 0xFFFF):rs+(inmediate & 0xFFFF)+2] << 16 #*65535 #2**16
-				regs[rt] += memory[rs+(inmediate & 0xFFFF):rs+(inmediate & 0xFFFF)+3] << 24 #*16777216 #2**24
+				regs[rt] = memory[rs+(inmediate):rs+(inmediate)+0]
+				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+1] << 8 #*256 #2**8
+				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+2] << 16 #*65535 #2**16
+				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+3] << 24 #*16777216 #2**24
 				PC = PC + 4
 			except:
 				EPC = PC
@@ -241,10 +247,10 @@ def decode_and_execute(instruction):
 			PC = PC + 4 
 		else if opcode == 0x2b: # SW WIP
 			try:
-				memory[rs+(inmediate & 0xFFFF)+0] = (regs[rt] & 0b00000000000000000000000011111111)
-				memory[rs+(inmediate & 0xFFFF)+1] = (regs[rt] & 0b00000000000000001111111100000000) >> 8
-				memory[rs+(inmediate & 0xFFFF)+2] = (regs[rt] & 0b00000000111111110000000000000000) >> 16
-				memory[rs+(inmediate & 0xFFFF)+3] = (regs[rt] & 0b11111111000000000000000000000000) >> 24
+				memory[rs+(inmediate)+0] = (regs[rt] & 0b00000000000000000000000011111111)
+				memory[rs+(inmediate)+1] = (regs[rt] & 0b00000000000000001111111100000000) >> 8
+				memory[rs+(inmediate)+2] = (regs[rt] & 0b00000000111111110000000000000000) >> 16
+				memory[rs+(inmediate)+3] = (regs[rt] & 0b11111111000000000000000000000000) >> 24
 				PC = PC + 4
 			except:	
 				EPC = PC
@@ -258,13 +264,13 @@ def decode_and_execute(instruction):
 		print "I opcode,rt,rs,inmediate",opcode,rs,rt,inmediate		
 
 	else if opcode == 0x02 and opcode == 0x03: # J
-		#000000aaaaaaaaaaaaaaaaaaaaaaaaaa	
+		#OOOOOOaaaaaaaaaaaaaaaaaaaaaaaaaa	
 		address = (instruction[0] & 0b11000000 >> 6)*256 + instruction[1]
 		if opcode == 0x2: #J
-			PC = address
+			PC = (PC & 0xf0000000) | (address << 2)
 		if opcode == 0x3: #JAL
-			regs[31] = PC
-			PC = address
+			regs[31] = PC + 8
+			PC = (PC & 0xf0000000) | (address << 2)
 		print "J opcode,address",opcode,address,
 
 	else:
