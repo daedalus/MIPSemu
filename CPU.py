@@ -16,9 +16,9 @@ def uint32tobytes(value,big_endian=True):
 
 def bytestouint32(value,big_endian=True):
         if big_endian:
-                return struct.unpack(">I", value)
+                return struct.unpack(">I", value)[0]
         else:
-                return struct.unpack("<I", value)
+                return struct.unpack("<I", value)[0]
 
 def int32tobytes(value,big_endian=True):
         if big_endian:
@@ -28,9 +28,9 @@ def int32tobytes(value,big_endian=True):
 
 def bytestoint32(value,big_endian=True):
         if big_endian:
-                return struct.unpack(">i", value)
+                return struct.unpack(">i", value)[0]
         else:
-                return struct.unpack("<i", value)
+                return struct.unpack("<i", value)[0]
 	
 memory = []
 
