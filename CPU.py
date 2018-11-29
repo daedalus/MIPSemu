@@ -37,13 +37,13 @@ memory = []
 REGBITS = 0xFFFFFFFF #32 bit Regs
 regs = [uint32tobytes(0) * 31] 
 PC = 0
-HI = 0
-LO = 0
-EPC = 0
-DIV0 = 0
-OF = 0
-CARRY = 0
-Cause_Reg = 0
+HI = uint32tobytes(0)
+LO = uint32tobytes(0)
+EPC = uint32tobytes(0)
+DIV0 = 0 # Flag
+OF = 0 # Flag
+CARRY = 0 # Flag
+Cause_Reg = uint32tobytes(0)
 
 
 """
