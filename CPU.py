@@ -8,19 +8,6 @@ import sys
 import os
 import time
 
-memory = []
-
-REGBITS = 0xFFFFFFFF #32 bit Regs
-regs = [0x00000000 * 31] 
-PC = 0
-HI = 0
-LO = 0
-EPC = 0
-DIV0 = 0
-OF = 0
-CARRY = 0
-Cause_Reg = 0
-
 def uint32tobytes(value,big_endian=True):
         if big_endian:
                 return struct.pack(">I", value)
@@ -44,6 +31,19 @@ def bytestoint32(value,big_endian=True):
                 return struct.unpack(">i", value)
         else:
                 return struct.unpack("<i", value)
+	
+memory = []
+
+REGBITS = 0xFFFFFFFF #32 bit Regs
+regs = [uint32tobytes(0) * 31] 
+PC = 0
+HI = 0
+LO = 0
+EPC = 0
+DIV0 = 0
+OF = 0
+CARRY = 0
+Cause_Reg = 0
 
 
 """
