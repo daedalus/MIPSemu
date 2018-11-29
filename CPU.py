@@ -80,14 +80,30 @@ def decode_and_execute(instruction):
 		shamt = (insctuction[2] & 0b00000111) << 8 + (instruction[3] & 0b11000000) >> 6
 		funct = (instruction[3] & 0b11111100) >> 2
 
-		if funct == 0x00: #NOP/SLL R0,0 WIP
-			regs[rd] = regs[rt] << shamt
+		if funct == 0x00: #SLL R0,0 / NOP
+			#regs[rd] = regs[rt] << shamt
+			val = regs[rt]
+    			for i in range(0,shamt):
+        			val <<= 1
+        			val |= 0
+    			regs[rd] = val & 0xFFFFFFFF
 			PC = PC + 4
-		else if funct == 0x02: #SRL WIP
-			regs[rd] = regs[rt] >> shamt
+		else if funct == 0x02: #SRL 
+			#regs[rd] = regs[rt] >> shamt
+			val = regs[rt]
+    			for i in range(0,shamt):
+        			val >>= 1
+        			val |= 0
+    			regs[rd] = val & 0xFFFFFFFF
                         PC = PC + 4
-		else if funct == 0x03: #SRA WIP
-			regs[rd] = (regs[rt] & (2**31)) + (regs[rt] >> shamt)
+		else if funct == 0x03: #SRA 
+			#regs[rd] = (regs[rt] & 0x80000000) + (regs[rt] >> shamt)
+			val = regs[rt]
+    			s = val & 0x80000000
+    			for i in range(0,n):
+        			val >>= 1
+        			val |= s
+    			regs[rd] = val & 0xFFFFFFFF
 			PC = PC + 4
 		else if fimct == 0x04: #SLLV
 			s = regs[rs] & 0b1111
