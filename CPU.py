@@ -3,6 +3,10 @@
 # GPLv2
 # MIPS CPU instruction set Emulator
 # WIP
+import struct
+import sys
+import os
+import time
 
 memory = []
 
@@ -17,6 +21,31 @@ OF = 0
 CARRY = 0
 Cause_Reg = 0
 
+def uint32tobytes(value,big_endian=True):
+        if big_endian:
+                return struct.pack(">I", value)
+        else:
+                return struct.pack("<I", value)
+
+def bytestouint32(value,big_endian=True):
+        if big_endian:
+                return struct.unpack(">I", value)
+        else:
+                return struct.unpack("<I", value)
+
+def int32tobytes(value,big_endian=True):
+        if big_endian:
+                return struct.pack(">i", value)
+        else:
+                return struct.pack("<i", value)
+
+def bytestoint32(value,big_endian=True):
+        if big_endian:
+                return struct.unpack(">i", value)
+        else:
+                return struct.unpack("<i", value)
+
+
 """
 0 INT Interrupt
 4 ADDRL Load from an illegal address
@@ -28,7 +57,6 @@ Cause_Reg = 0
 10 RI Reserved instruction
 12 OVF Arithmetic overflow
 """
-
 
 def twos_complement(input_value, num_bits):
 	'''Calculates a two's complement integer from the given input value's bits'''
