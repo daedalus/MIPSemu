@@ -92,7 +92,10 @@ def twos_complement(input_value, num_bits):
 	return -(input_value & mask) + (input_value & ~mask)
 
 def zero_extend(value):
-	return value
+	tmp = value
+	for i in range(0,4-len(value)):	
+		tmp = chr(0) + tmp
+	return tmp
 
 def sint3232(value):
 	return twos_complement(value,32)
@@ -189,20 +192,22 @@ def decode_and_execute(instruction):
 		else if funct == 0x12: #MFLO
 			regs[rd] = LO
 			PC = PC + 4
-		else if funct ==0x18: #MUL WIP
-	                HILO = sint32(regs[rs]) * sint32(regs[rt])
-			HI = HILO >> REGBITS
-			LO = (HILO << REGBITS) >> REGBITS
+		else if funct ==0x18: #MUL
+			temp = bytestoint32(regs[rs]) * bytestoint32(regs[rt])
+			LO = uint32tobytes(((temp & 0x00000000FFFFFFFF) << 32) >> 32)
+			HI = uint32tobytes(((temp & 0xFFFFFFFF00000000) >> 32))
                         PC = PC + 4
 		else if funct == 0x19: #MULU
-			HILO = regs[rs] * regs[rt]
-                        HI = HILO >> REGBITS
-                        LO = (HILO << REGBITS) >> REGBITS
+			temp = bytestouint32(regs[rs]) * bytestouint32(regs[rt])
+			LO = uint32tobytes(((temp & 0x00000000FFFFFFFF) << 32) >> 32)
+			HI = uint32tobytes(((temp & 0xFFFFFFFF00000000) >> 32))
 			PC = PC + 4
                 else if funct == 0x1A: #DIV 
                         try:
-                                LO = sint32(regs[rs]) / sint32(regs[rt])
-                                HI = sint32(regs[rs]) % sint32(regs[rt])
+				tmp1 = bytestoint32(regs[rs]) / bytestoint32(regs[rt])
+				tmp2 = bytestoint32(regs[rs]) % bytestoint32(regs[rt])
+				LO = int32tobytes(tmp1)
+				HI = int32tobytes(tmp2)
                                 PC = PC + 4
                         except:
                                 EPC = PC
@@ -211,8 +216,10 @@ def decode_and_execute(instruction):
                                 PC = KERNEL_MODE + 0x80
                 else if funct == 0x1B: #DIVU
                         try:
-                                LO = regs[rs] / regs[rt]
-                                HI = regs[rs] % regs[rt]
+                                tmp1 = bytestouint32(regs[rs]) / bytestouint32(regs[rt])
+                                tmp2 = bytestouint32(regs[rs]) % bytestouint32(regs[rt])
+				LO = uint32tobytes(tmp1)
+				HI = uint32tobytes(tmp2)
                                 PC = PC + 4
                         except:
                                 EPC = PC
@@ -220,54 +227,64 @@ def decode_and_execute(instruction):
                                 Cause_Reg = 12
                                 PC = KERNEL_MODE + 0x80
 		else if funct == 0x20: #ADD
-			temp = sint32(regs[rs]) + sint32(regs[rt])
-			OF = (sint32(regs[rd]) >= REGBITS)
-			if OF == 1:
-				regs[rd] = sint32(tmp)
-                                Cause_Reg = 0b1100
-                                PC = KERNEL_MODE + 0x80
-                        else:
-                                PC = PC + 4
+			temp = bytestoint32(regs[rs]) + bytestoint32(regs[rt])
+			s1 = (bytestouint32(regs[rs]) & mask) >> 31
+			s2 = (bytestouint32(regs[rt]) & mask) >> 31
+			t = (temp & mask) >> 31
+			OF = (t == int(not(s1 ^ s2))) 
+			if not OF:
+				regs[rd] = int32tobytes(temp)
+				PC = PC + 4
+			else:
+			  	Cause_Reg = 0b1100
+                                PC = KERNEL_MODE + 0x80	
 		else if funct == 0x21: #ADDU 
-			temp = regs[rs] + regs[rt]
-			regs[rd] = sint32(temp)
+			temp = bytestoint32(regs[rs]) + bytestoint32(regs[rt]) % 0x7fffffff
+			regs[rd] = int32tobytes(temp)
                         PC = PC + 4
 		else if funct == 0x22: #SUB
-			tmp = regs[rd] 
-			regs[rd] = sint32(regs[rs]) - sint32(regs[rt])
-			OF = (sint32(regs[rd]) >= REGBITS)
-			if OF == 1:
-				regs[rd] = tmp
+			temp = bytestoint32(regs[rs]) - bytestoint32(regs[rt])
+                        s1 = (bytestouint32(regs[rs]) & mask) >> 31
+                        s2 = (bytestouint32(regs[rt]) & mask) >> 31
+                        t = (temp & mask) >> 31
+			OF = (s1 == (t ^ s2))
+			if OF:
                                 Cause_Reg = 0b1100
                                 PC = KERNEL_MODE + 0x80
                         else:
+				regs[rd] = int32tobytes(tmp)
                                 PC = PC + 4	
 		else if funct == 0x23: #SUBU
-			regs[rd] = regs[rs] - regs[rt]
+			temp = bytestoint32(regs[rs]) - bytestoint32(regs[rt]) % 0x7fffffff
+			regs[rd] = int32tobytes(temp)
                         PC = PC + 4	
 		else if funct == 0x24: #AND
-			regs[rd] = regs[rs] & regs[rt]
+			temp = bytestouint32(regs[rs]) & bytestouint32(regs[rt])
+			regs[rd] = uint32tobytes(temp)
 			PC = PC + 4
 		else if funct == 0x25: #OR
-			regs[rd] = regs[rs] | regs[rt]
+			temp = bytestouint32(regs[rs]) | bytestouint32(regs[rt])
+			regs[rd] = uint32tobytes(temp)
                         PC = PC + 4
 		else if funct == 0x26: #XOR
-			regs[rd] = regs[rs] ^ regs[rt]
+			temp = bytestouint32(regs[rs]) ^ bytestouint32(regs[rt])
+			regs[rd] = uint32tobytes(temp)
 			PC = PC + 4
 		else if funct == 0x27: #NOR
-			regs[rd] = (regs[rs] | regs[rt]) ^ REGBITS
+			temp = (bytestouint32(regs[rs]) | bytestouint32(regs[rt])) ^ REGBITS
+			regs[rd] = uint32tobytes(temp)
 			PC = PC + 4
 		else if funct == 0x2A: #SLT		
-			if sint32(regs[rs]) < sint32(regs[rt]):
-				regs[rd] = 1
+			if bytestoint32(regs[rs]) < bytestoint32(regs[rt]):
+				regs[rd] = bytestouint32(1)
 			else
-				regs[rd] = 0
+				regs[rd] = bytestouint32(0)
 			PC = PC + 4
 		else if funct == 0x2B: #SLTU		
-			if regs[rs] < regs[rt]:
-                                regs[rd] = 1
+			if bytestouint32(regs[rs]) < bytestouint32(regs[rt]):
+                                regs[rd] = bytestouint32(1)
                         else
-                                regs[rd] = 0
+                                regs[rd] = bytestouint32(0)
 			PC = PC + 4
 		else:
 			EPC = PC
@@ -280,51 +297,69 @@ def decode_and_execute(instruction):
 		#OOOOOOssssstttttiiiiiiiiiiiiiiii
 		rs = (instruction[0] & 0b00000011) << 8 + ((instruction[1] & 0b11100000) >> 5)
 	        rt = instruction[1] & 0b00011111
-        	inmediate = instruction[2] << 8 + instruction[3]
+        	inmediate = instruction[2] + instruction[3]
 
-		if opcode == 0x01: # BLTZ
-			if regs[rs] < 0:
-				PC = PC + sint32(inmmediate) << 2
-			else:
-				PC = PC + 4
-
+		if opcode == 0x01: # BLTZ/BLTAL
+			if rt == 0x00: # BLTZ
+				tgt_offset = bytestoint32(inmmediate) << 2
+				if bytestoint32(regs[rs]) < 0:
+					PC = PC + tgt_offset
+				else:
+					PC = PC + 4
+			else if rt == 0x01: #BLTZAL
+				tgt_offset = bytestoint32(inmediate) << 2
+				regs[31] = PC + 8
+				if bytestoint32(regs[rs]) < 0:
+					PC = PC + tgt_offset
+				else		
+					PC = PC + 4
 		if opcode == 0x08: #ADDI
-			temp = regs[rs] + sint32(inmediate) 
-			OF = (temp >= REGBITS)
+			temp = bytestoint32(regs[rs]) + bytestoint32(inmediate) 
+			s1 = (bytestouint32(regs[rs]) & mask) >> 31
+			s2 = (bytestouint32(inmediate) & mask) >> 31
+			t = (temp & mask) >> 31
+			#print s1,s2,t
+			OF = (t == int(not(s1 ^ s2)))
 			if OF == 1:
 				EPC = PC
 				Cause_Reg = 0b1100
 				PC = KERNEL_MODE + 0x80
 			else:
-				regs[rt] = sint32(temp)
+				regs[rt] = int32tobytes(temp)
 				PC = PC + 4
 		else if opcode == 0x09: #ADDIU
-			temp = regs[rs] + sint32(inmediate)
-			regs[rt] = sint32(temp)
+			temp = (bytestoint32(regs[rs]) + bytestoint32(inmediate)) % 0x7fffffff 
+			regs[rt] = int32tobytes(temp) 
 			PC = PC + 4
 		else if opcode == 0x0C: #ANDI 
-			regs[rt] = regs[rs] & zero_extend(inmediate)
+			temp = bytestouint32(regs[rs]) & bytestouint32(inmediate)
+			regs[rt] = temp
 			PC = PC + 4
 		else if opcode == 0x04: #BEQ 
-			if regs[rt] = regs[rt] 
-				PC += sint32(inmediate) << 2
+			tgt_offset = bytestoint32(inmediate) << 2
+			if regs[rs] = regs[rt] 
+				PC = PC + tgt_offset
 			else:
 				PC = PC + 4
 		else if opcode == 0x05: #BNEQ
-			if regs[rt] != regs[rt] 
-                                PC += sint32(inmediate) << 2
+			tgt_offset = bytestoint32(inmediate) << 2
+			if regs[rs] != regs[rt] 
+                                PC = PC + tgt_offset
                         else:
                                 PC = PC + 4
 		else if opcode == 0x06: #BLEZ 
-			if regs[rs] <= 0:
-				PC = PC + sint32(inmediate) << 2
+			tgt_offset = bytestoint32(inmediate) << 2
+			if bytestoint32(regs[rs]) <= 0:
+				PC = PC + tgt_offset
 			else:
 				PC = PC + 4
 		else if opcode == 0x07: #BGTZ
-			if regs[rs] > 0:
-				PC = PC + (inmediate) << 2
+			tgt_offset = bytestoint32(inmediate) << 2
+			if bytestoint32(regs[rs]) > 0:
+				PC = PC + tgt_offset
 			else:
 				PC = PC + 4
+
 		else if opcode == 0x10: # MFEPC/MFCO
 			if rt = 0b01110:
 				regs[rd] = EPC
@@ -333,37 +368,62 @@ def decode_and_execute(instruction):
 			PC = PC + 4
 
 		else if opcode == 0x0A: #SLTI
-			if sint32(regs[rs]) < sint32(inmediate):
-				regs[rs] = 1
+			if bytestoint32(regs[rs]) < bytestoint32(inmediate):
+				regs[rt] = bytestouint32(1)
 			else:
-				regs[rs] = 0
+				regs[rt] = bytestouint32(0)
 			PC = PC + 4	
+
 		else if opcode == 0x0C: #SLTIU
-                	if regs[rs] < sint32(inmediate):
-                        	regs[rs] = 1
+                	if bytestouint32(regs[rs]) < bytestoint32(inmediate):
+                        	regs[rt] = bytestouint32(1)
                         else:
-                                regs[rs] = 0
+                                regs[rt] = bytestouint32(0)
                         PC = PC + 4
+
 		else if opcode == 0x0D: #ORI
-			regs[rd] = regs[rs] | (inmediate)
+			regs[rt] = regs[rs] | zero_extend(inmediate) 
 			PC = PC + 4
 
-		else if opcode == 0x20:	# LB WIP
-			regs[rt] = memory[rs+(inmediate):rs+(inmediate)]
-			PC = PC + 4
-		else if opcode == 0x23: # LW WIP
+		else if opcode == 0x20:	# LB 
+			base = bytestouint32(regs[rs]) + bytestoint32(inmediate)
 			try:
-				regs[rt] = memory[rs+(inmediate):rs+(inmediate)+0]
-				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+1] << 8 #*256 #2**8
-				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+2] << 16 #*65535 #2**16
-				regs[rt] += memory[rs+(inmediate):rs+(inmediate)+3] << 24 #*16777216 #2**24
+				temp = memory[base:base+4]
+				s = (ord(temp[0]) & 0x80) >> 7
+				temp = zero_extend(temp[0])
+				temp[3] = chr(ord(temp[3]) | s 
+				regs[rt] = temp
 				PC = PC + 4
+			except:
+				EPC = PC
+                                Cause_Reg = 0b100 # 4
+                                PC = KERNEL_MODE + 0x80
+		else if opcode == 0b100100: #LBU
+			base = bytestouint32(regs[rs]) + bytestoint32(inmediate)
+                        try:
+                                temp = zero_extend(memory[base:base+4])
+				regs[rt] = zero_extend(temp[0])
+                                PC = PC + 4
+                        except:
+                                EPC = PC
+                                Cause_Reg = 0b100 # 4
+                                PC = KERNEL_MODE + 0x80
+		else if opcode == 0x23: # LW 
+			base = bytestouint32(regs[rs]) + bytestoint32(inmediate)
+			try:
+				if (base & 0b10 == 0b10) or (base & 0b01 == 0b01):
+					EPC = PC
+                                	Cause_Reg = 0b100 # 4
+					PC = KERNEL_MODE + 0x80
+				else:
+					regs[rt] = memory[base:base+4]
+					PC = PC + 4
 			except:
 				EPC = PC
 				Cause_Reg = 0b100 # 4
 				PC = KERNEL_MODE + 0x80
 
-		else if opcode == 0x28: # LB WIP
+		else if opcode == 0x28: # SB WIP
 			memory[rs+(inmediate & 0x0000FFFF)] = regs[rt] & 0x000000FF
 			PC = PC + 4 
 		else if opcode == 0x2b: # SW WIP
