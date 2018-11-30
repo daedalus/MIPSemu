@@ -34,6 +34,21 @@ def bytestoint32(value,big_endian=True):
 	
 memory = []
 
+KERNEL_MODE = 0x80000000
+KERNEL_MODE_UTLB = KERNEL_MODE
+KERNEL_MODE_OTHER = KERNEL_MODE + 0x80
+PROCESOR_RESET = 0xbfc000000 
+PROCESOR_RESET_UTLB = PROCESOR_RESET + 0x100
+PROCESOR_RESET_OTHER = PROCESOR_RESET + 0x180
+"""
+Address Description
+0x80000000  UTLB miss exception
+0x80000080  Other exceptions
+0xbfc00000  Processor reset
+0xbfc00100  UTLB miss exception, if BEV is set in c0_status
+0xbfc00180  Other exceptions, if BEV is set in c0_status
+"""
+
 REGBITS = 0xFFFFFFFF #32 bit Regs
 regs = [uint32tobytes(0) * 31] 
 PC = 0
@@ -45,8 +60,21 @@ OF = 0 # Flag
 CARRY = 0 # Flag
 Cause_Reg = uint32tobytes(0)
 
-
 """
+Memory maps
+0xffffffff  kseg2    
+0xc0000000   
+0xbfffffff  kseg1    
+0xbfc00180          Exception address if BEV set.
+0xbfc00100          UTLB exception address if BEV set.
+0xbfc00000          Execution begins here after processor reset.
+0xa0000000   
+0x9fffffff  kseg0    
+0x80000080          Exception address if BEV not set.
+0x80000000          UTLB exception address if BEV not set.
+0x7fffffff  kuseg    
+0x00000000   
+
 0 INT Interrupt
 4 ADDRL Load from an illegal address
 5 ADDRS Store to an illegal address
@@ -100,36 +128,61 @@ def decode_and_execute(instruction):
 			#regs[rd] = (regs[rt] & 0x80000000) + (regs[rt] >> shamt)
 			val = regs[rt]
     			s = val & 0x80000000
-    			for i in range(0,n):
+    			for i in range(0,shamt):
         			val >>= 1
         			val |= s
     			regs[rd] = val & 0xFFFFFFFF
 			PC = PC + 4
 		else if fimct == 0x04: #SLLV
 			s = regs[rs] & 0b1111
-			regs[rd] = regs[rt] << s
+			#regs[rd] = regs[rt] << s
+                        val = regs[rt]
+                        for i in range(0,s):
+                            val <<= 1
+                        regs[rd] = val & 0xFFFFFFFF
+                        PC = PC + 4
 		else if funct == 0x06: #SRLV
-			s =  regs[rs] & 0b1111 
-			regs[rd] = regs[rt] & (2**31)) + (regs[rt] >> s)
-			PC = PC + 4
+			s = regs[rs] & 0b1111 
+                        val = regs[rt]
+			#regs[rd] = regs[rt] & (2**31)) + (regs[rt] >> s)
+                        for i in range(0,s):
+                            val >>= 1
+                        regs[rd] = val & 0xFFFFFFFF
+                        PC = PC + 4
 		else if funct == 0x07: #SRAV
 			s = regs[rs] & 0b1111
-			regs[rd] = (regs[rt] & (2**31)) + (regs[rt] >> s)
+                        val = regs[rt]
+			#regs[rd] = (regs[rt] & (2**31)) + (regs[rt] >> s)
+                        for i in range(0,s):
+                            val >>= 1
+                            val |= 1
+                        regs[rd] = val & 0xFFFFFFFF
                         PC = PC + 4
 		else if funct == 0x08: #JR
 			temp = regs[rs]
+                        if (temp & 0x00000003 == 0): #0..11
+                            PC = temp
+                        else:
+                            Cause_Reg = 0
+                            PC = KERNEL_MODE
 			PC = temp
 		else if funct == 0x09: #JALR
 			temp = regs[rs]
-			regs[rd] = PC + 8 
-			PC = temp
+			regs[rd] = PC + 8
+                        if (temp & 0x00000001 != 0) or (temp & 0x00000002 != 0): #0..01 or 0..10 
+                            Cause_Reg = 0
+                            PC = KERNEL_MODE
+                        else:
+                            PC = temp
 		else if funct == 0x10: #MFHI
 			regs[rd] = HI
 			PC = PC + 4
 		else if funct == 0x0C: #SYSCALL
-			PC = 0x00000080
+                        Cause_Reg = 8
+			PC = KERNEL_MODE
 		else if funct == 0x0d: # BREAK
-			PC = 0x00000080
+                        Cause_Reg = 9
+			PC = KERNEL_MODE
 		else if funct == 0x0E: #XORI
 			regs[rt] = regs[rs] ^ zero_extend(inmediate)
 			PC = PC + 4
@@ -155,7 +208,7 @@ def decode_and_execute(instruction):
                                 EPC = PC
                                 DIV0 = 1
                                 Cause_Reg = 12
-                                PC = 0x80000180
+                                PC = KERNEL_MODE + 0x80
                 else if funct == 0x1B: #DIVU
                         try:
                                 LO = regs[rs] / regs[rt]
@@ -165,13 +218,14 @@ def decode_and_execute(instruction):
                                 EPC = PC
                                 DIV0 = 1
                                 Cause_Reg = 12
-                                PC = 0x80000180
+                                PC = KERNEL_MODE + 0x80
 		else if funct == 0x20: #ADD
 			temp = sint32(regs[rs]) + sint32(regs[rt])
 			OF = (sint32(regs[rd]) >= REGBITS)
 			if OF == 1:
 				regs[rd] = sint32(tmp)
                                 Cause_Reg = 0b1100
+                                PC = KERNEL_MODE + 0x80
                         else:
                                 PC = PC + 4
 		else if funct == 0x21: #ADDU 
@@ -185,6 +239,7 @@ def decode_and_execute(instruction):
 			if OF == 1:
 				regs[rd] = tmp
                                 Cause_Reg = 0b1100
+                                PC = KERNEL_MODE + 0x80
                         else:
                                 PC = PC + 4	
 		else if funct == 0x23: #SUBU
@@ -217,7 +272,7 @@ def decode_and_execute(instruction):
 		else:
 			EPC = PC
                         Cause_Reg = 10
-                        PC = 0x80000180
+                        PC = KERNEL_MODE + 0x80
 
 		print "R opcode,rt,rs,rd,shamt,funct",opcode,rs,rt,rd,shamt,funct
 
@@ -239,7 +294,7 @@ def decode_and_execute(instruction):
 			if OF == 1:
 				EPC = PC
 				Cause_Reg = 0b1100
-				PC = 0x80000180
+				PC = KERNEL_MODE + 0x80
 			else:
 				regs[rt] = sint32(temp)
 				PC = PC + 4
@@ -305,11 +360,11 @@ def decode_and_execute(instruction):
 				PC = PC + 4
 			except:
 				EPC = PC
-				Cause_Reg = 0b100
-				PC = 0x80000180
+				Cause_Reg = 0b100 # 4
+				PC = KERNEL_MODE + 0x80
 
 		else if opcode == 0x28: # LB WIP
-			memory[rs+(inmediate & 0xFFFF)] = regs[rt] & 0xFF
+			memory[rs+(inmediate & 0x0000FFFF)] = regs[rt] & 0x000000FF
 			PC = PC + 4 
 		else if opcode == 0x2b: # SW WIP
 			try:
@@ -320,8 +375,8 @@ def decode_and_execute(instruction):
 				PC = PC + 4
 			except:	
 				EPC = PC
-				Cause_Reg = 0b101
-				PC = 0x80000180
+				Cause_Reg = 0b101 # 5
+				PC = KERNEL_MODE + 0x80
 		else:
                 	EPC = PC
 	                Cause_Reg = 0b1010
@@ -331,7 +386,7 @@ def decode_and_execute(instruction):
 
 	else if opcode == 0x02 and opcode == 0x03: # J
 		#OOOOOOaaaaaaaaaaaaaaaaaaaaaaaaaa	
-		address = (instruction[0] & 0b11000000 >> 6)*256 + instruction[1]
+		address = (instruction[0] & 0b11000000 >> 6) * 0xff + instruction[1]
 		if opcode == 0x2: #J
 			PC = (PC & 0xf0000000) | (address << 2)
 		if opcode == 0x3: #JAL
@@ -342,7 +397,7 @@ def decode_and_execute(instruction):
 	else:
 		EPC = PC
 		Cause_Reg = 0b1010
-		PC = 0x80000180
+                PC = KERNEL_MODE + 0x80
 
 	print "regs",regs
 	print "EPC,PC,ret,OF,CARRY,DIV0,Cause_Reg",EPC,PC,ret,OF,CARRY,DIV0,Cause_Reg
@@ -359,9 +414,11 @@ def save_ram(fname):
 
 
 def execute():
+        RUN = True
 	ramfile = sys.argv[1]
 	load_ram(ramfile)
-	while True:
+        PC = PROCESOR_RESET # Set PC <- PROCESOR RESET VECTOR
+	while RUN:
 		instruction = memory[PC:PC+4]
 		decode_and_execute(instruction)
 	save_ram(ramfile)
